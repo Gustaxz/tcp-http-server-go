@@ -21,23 +21,23 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
+	defer conn.Close()
 
-	for {
-		buf := make([]byte, 1024)
-		_, err = conn.Read(buf)
-		if err != nil {
-			_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-			if err != nil {
-				fmt.Println("Error writing: ", err.Error())
-				os.Exit(1)
-			}
-			if err.Error() == "EOF" {
-				fmt.Println("Connection closed")
-				os.Exit(0)
-			}
-			fmt.Println("Error reading: ", err.Error())
-			os.Exit(1)
+	buf := make([]byte, 1024)
+	_, err = conn.Read(buf)
+	if err != nil {
+		if err.Error() == "EOF" {
+			fmt.Println("Connection closed")
+			os.Exit(0)
 		}
-		fmt.Println(string(buf))
+		fmt.Println("Error reading: ", err.Error())
+		os.Exit(1)
 	}
+	_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	if err != nil {
+		fmt.Println("Error writing: ", err.Error())
+		os.Exit(1)
+	}
+	fmt.Println(string(buf))
+
 }
