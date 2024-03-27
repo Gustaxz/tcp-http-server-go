@@ -16,10 +16,24 @@ func main() {
 	defer l.Close()
 	fmt.Println("Listening on Port 4221")
 
-	_, err = l.Accept()
+	conn, err := l.Accept()
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
 
+	for {
+		buf := make([]byte, 1024)
+		_, err = conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading: ", err.Error())
+			os.Exit(1)
+		}
+		fmt.Println(string(buf))
+		_, err = conn.Write([]byte("HTTP 1.1 200 OK\r\n\r\n"))
+		if err != nil {
+			fmt.Println("Error writing: ", err.Error())
+			os.Exit(1)
+		}
+	}
 }
