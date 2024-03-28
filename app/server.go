@@ -4,7 +4,34 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
+
+func handleRequest(msg []byte) ([]byte, error) {
+	strMsg := string(msg)
+	strMsgSplit := strings.Split(strMsg, "\r\n")
+
+	for i, line := range strMsgSplit {
+
+		switch i {
+		case 0:
+			parts := strings.Split(line, " ")
+			fmt.Println("Method: ", parts[0])
+			fmt.Println("Path: ", parts[1])
+			fmt.Println("Protocol: ", parts[2])
+
+			if parts[1] != "/" {
+				fmt.Println("Invalid path")
+				return []byte("HTTP/1.1 404 Not Found\r\n\r\n"), nil
+			}
+
+			return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
+		}
+
+	}
+
+	return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
+}
 
 func main() {
 
@@ -33,11 +60,12 @@ func main() {
 		fmt.Println("Error reading: ", err.Error())
 		os.Exit(1)
 	}
-	_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	fmt.Println(string(buf))
+	msg, err := handleRequest(buf)
 	if err != nil {
-		fmt.Println("Error writing: ", err.Error())
+		fmt.Println("Error handling request: ", err.Error())
 		os.Exit(1)
 	}
-	fmt.Println(string(buf))
-
+	conn.Write(msg)
+	fmt.Println("Response sent")
 }
