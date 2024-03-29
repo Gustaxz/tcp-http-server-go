@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+func formatTextResponse(msg string) []byte {
+	return []byte(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(msg)) + "\r\n\r\n" + msg)
+
+}
+
 func handleRequest(msg []byte) ([]byte, error) {
 	strMsg := string(msg)
 	strMsgSplit := strings.Split(strMsg, "\r\n")
@@ -20,12 +26,19 @@ func handleRequest(msg []byte) ([]byte, error) {
 			fmt.Println("Path: ", parts[1])
 			fmt.Println("Protocol: ", parts[2])
 
-			if parts[1] != "/" {
-				fmt.Println("Invalid path")
-				return []byte("HTTP/1.1 404 Not Found\r\n\r\n"), nil
+			if parts[1] == "/" {
+				return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
 			}
 
-			return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
+			paths := strings.Split(parts[1], "/")
+
+			if len(paths) == 3 {
+				if paths[1] == "echo" {
+					return formatTextResponse(paths[2]), nil
+				}
+			}
+
+			return []byte("HTTP/1.1 404 Not Found\r\n\r\n"), nil
 		}
 
 	}
