@@ -32,9 +32,10 @@ func handleRequest(msg []byte) ([]byte, error) {
 
 			paths := strings.Split(parts[1], "/")
 
-			if len(paths) == 3 {
+			if len(paths) >= 3 {
 				if paths[1] == "echo" {
-					return formatTextResponse(paths[2]), nil
+					msg := strings.Replace(parts[1], "/echo/", "", 1)
+					return formatTextResponse(msg), nil
 				}
 			}
 
