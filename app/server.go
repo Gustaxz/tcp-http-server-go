@@ -9,6 +9,8 @@ import (
 	"github.com/codecrafters-io/http-server-starter-go/app/status"
 )
 
+// Path: app/server.go
+
 type HttpRequest struct {
 	Method   string
 	Path     string
