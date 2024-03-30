@@ -5,46 +5,91 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/codecrafters-io/http-server-starter-go/app/status"
 )
 
-func formatTextResponse(msg string) []byte {
-	return []byte(
-		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(msg)) + "\r\n\r\n" + msg)
-
+type HttpRequest struct {
+	Method   string
+	Path     string
+	Protocol string
+	Headers  map[string]string
 }
 
+func formatResponse(msg string, status status.HttpStatus) []byte {
+	return []byte(
+		"HTTP/1.1 " + fmt.Sprint(status.StatusCode) + " " + status.StatusMsg + "\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(msg)) + "\r\n\r\n" + msg)
+}
+
+func formatTextResponse(msg string) []byte {
+	fmtMsg := strings.Trim(msg, " ")
+	return []byte(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(fmtMsg)) + "\r\n\r\n" + fmtMsg)
+
+}
 func handleRequest(msg []byte) ([]byte, error) {
 	strMsg := string(msg)
 	strMsgSplit := strings.Split(strMsg, "\r\n")
+	httpReq := HttpRequest{}
+	headers := make(map[string]string)
+
+	if len(strMsgSplit) < 1 {
+		return formatResponse("Bad Request", status.BadRequest), nil
+	}
 
 	for i, line := range strMsgSplit {
 
-		switch i {
-		case 0:
+		if i == 0 {
 			parts := strings.Split(line, " ")
-			fmt.Println("Method: ", parts[0])
-			fmt.Println("Path: ", parts[1])
-			fmt.Println("Protocol: ", parts[2])
+			httpReq.Method = parts[0]
+			httpReq.Path = parts[1]
+			httpReq.Protocol = parts[2]
+		}
 
-			if parts[1] == "/" {
-				return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
-			}
-
-			paths := strings.Split(parts[1], "/")
-
-			if len(paths) >= 3 {
-				if paths[1] == "echo" {
-					msg := strings.Replace(parts[1], "/echo/", "", 1)
-					return formatTextResponse(msg), nil
-				}
-			}
-
-			return []byte("HTTP/1.1 404 Not Found\r\n\r\n"), nil
+		if i > 0 && strings.Contains(line, ":") {
+			parts := strings.Split(line, ":")
+			headers[parts[0]] = parts[1]
 		}
 
 	}
 
-	return []byte("HTTP/1.1 200 OK\r\n\r\n"), nil
+	pathParts := strings.Split(httpReq.Path, "/")
+
+	if httpReq.Path == "/" {
+		return status.FormatStatus(status.OK), nil
+	}
+
+	if pathParts[1] == "echo" {
+		echo := strings.Replace(httpReq.Path, "/echo/", "", 1)
+		return formatTextResponse(echo), nil
+	}
+
+	if pathParts[1] == "user-agent" {
+		return formatTextResponse(headers["User-Agent"]), nil
+	}
+
+	return status.FormatStatus(status.NotFound), nil
+}
+
+func handleConnection(conn net.Conn) {
+	buf := make([]byte, 1024)
+	_, err := conn.Read(buf)
+	if err != nil {
+		if err.Error() == "EOF" {
+			fmt.Println("Connection closed")
+			os.Exit(0)
+		}
+		fmt.Println("Error reading: ", err.Error())
+		os.Exit(1)
+	}
+	defer conn.Close()
+	fmt.Println(string(buf))
+	msg, err := handleRequest(buf)
+	if err != nil {
+		fmt.Println("Error handling request: ", err.Error())
+		os.Exit(1)
+	}
+	conn.Write(msg)
 }
 
 func main() {
@@ -57,29 +102,14 @@ func main() {
 	defer l.Close()
 	fmt.Println("Listening on Port 4221")
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
-	defer conn.Close()
-
-	buf := make([]byte, 1024)
-	_, err = conn.Read(buf)
-	if err != nil {
-		if err.Error() == "EOF" {
-			fmt.Println("Connection closed")
-			os.Exit(0)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
 		}
-		fmt.Println("Error reading: ", err.Error())
-		os.Exit(1)
+		fmt.Println("Accepted connection from ", conn.RemoteAddr())
+		go handleConnection(conn)
 	}
-	fmt.Println(string(buf))
-	msg, err := handleRequest(buf)
-	if err != nil {
-		fmt.Println("Error handling request: ", err.Error())
-		os.Exit(1)
-	}
-	conn.Write(msg)
-	fmt.Println("Response sent")
+
 }
