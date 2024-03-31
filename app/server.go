@@ -23,6 +23,11 @@ func formatResponse(msg string, status status.HttpStatus) []byte {
 		"HTTP/1.1 " + fmt.Sprint(status.StatusCode) + " " + status.StatusMsg + "\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(msg)) + "\r\n\r\n" + msg)
 }
 
+func formatOcStreamResponse(msg string, status status.HttpStatus) []byte {
+	return []byte(
+		"HTTP/1.1 " + fmt.Sprint(status.StatusCode) + " " + status.StatusMsg + "\r\nContent-Type: application/octet-stream\r\nContent-Length: " + fmt.Sprint(len(msg)) + "\r\n\r\n" + msg)
+}
+
 func formatTextResponse(msg string) []byte {
 	fmtMsg := strings.Trim(msg, " ")
 	return []byte(
@@ -106,7 +111,7 @@ func handleRequest(msg []byte, directory string) ([]byte, error) {
 		data := string(fileBytes)
 		fmt.Println(data)
 		if exists {
-			return formatTextResponse(data), nil
+			return formatOcStreamResponse(data, status.OK), nil
 		}
 		return formatResponse("Not Found", status.NotFound), nil
 	}
