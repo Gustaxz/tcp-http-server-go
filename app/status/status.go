@@ -11,6 +11,7 @@ var OK = HttpStatus{200, "OK"}
 var BadRequest = HttpStatus{400, "Bad Request"}
 var InternalServerError = HttpStatus{500, "Internal Server Error"}
 var NotFound = HttpStatus{404, "Not Found"}
+var Created = HttpStatus{201, "Created"}
 
 func FormatStatus(status HttpStatus) []byte {
 	return []byte(

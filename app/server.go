@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -16,6 +17,7 @@ type HttpRequest struct {
 	Path     string
 	Protocol string
 	Headers  map[string]string
+	Body     string
 }
 
 func formatResponse(msg string, status status.HttpStatus) []byte {
@@ -61,11 +63,29 @@ func handleGetFile(path string, directory string) ([]byte, bool, error) {
 	return fileBytes, true, nil
 }
 
+func handlePostFile(path string, directory string, data []byte) error {
+	fmt.Println("File size: ", len(data))
+	fullPath := directory + path
+	file, err := os.Create(fullPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(bytes.Trim(data, "\x00"))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func handleRequest(msg []byte, directory string) ([]byte, error) {
 	strMsg := string(msg)
 	strMsgSplit := strings.Split(strMsg, "\r\n")
 	httpReq := HttpRequest{}
 	headers := make(map[string]string)
+	httpReq.Body = strMsgSplit[len(strMsgSplit)-1]
 
 	if len(strMsgSplit) < 1 {
 		return formatResponse("Bad Request", status.BadRequest), nil
@@ -103,6 +123,15 @@ func handleRequest(msg []byte, directory string) ([]byte, error) {
 	}
 
 	if pathParts[1] == "files" {
+		if httpReq.Method == "POST" {
+			path := strings.Replace(httpReq.Path, "/files/", "", 1)
+			err := handlePostFile(path, directory, []byte(httpReq.Body))
+			if err != nil {
+				return formatResponse("Internal Server Error", status.InternalServerError), nil
+			}
+			return status.FormatStatus(status.Created), nil
+		}
+
 		path := strings.Replace(httpReq.Path, "/files/", "", 1)
 		fileBytes, exists, err := handleGetFile(path, directory)
 		if err != nil {
