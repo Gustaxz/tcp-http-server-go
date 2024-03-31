@@ -29,7 +29,34 @@ func formatTextResponse(msg string) []byte {
 		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(fmtMsg)) + "\r\n\r\n" + fmtMsg)
 
 }
-func handleRequest(msg []byte) ([]byte, error) {
+
+func handleGetFile(path string, directory string) ([]byte, bool, error) {
+	fullPath := directory + path
+	file, err := os.Open(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+
+		return nil, false, err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, false, err
+	}
+
+	fileSize := fileInfo.Size()
+	fileBytes := make([]byte, fileSize)
+	_, err = file.Read(fileBytes)
+	if err != nil {
+		return nil, false, err
+	}
+	return fileBytes, true, nil
+}
+
+func handleRequest(msg []byte, directory string) ([]byte, error) {
 	strMsg := string(msg)
 	strMsgSplit := strings.Split(strMsg, "\r\n")
 	httpReq := HttpRequest{}
@@ -70,10 +97,24 @@ func handleRequest(msg []byte) ([]byte, error) {
 		return formatTextResponse(headers["User-Agent"]), nil
 	}
 
+	if pathParts[1] == "files" {
+		path := strings.Replace(httpReq.Path, "/files/", "", 1)
+		fileBytes, exists, err := handleGetFile(path, directory)
+		if err != nil {
+			return formatResponse("Internal Server Error", status.InternalServerError), nil
+		}
+		data := string(fileBytes)
+		fmt.Println(data)
+		if exists {
+			return formatTextResponse(data), nil
+		}
+		return formatResponse("Not Found", status.NotFound), nil
+	}
+
 	return status.FormatStatus(status.NotFound), nil
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, directory string) {
 	buf := make([]byte, 1024)
 	_, err := conn.Read(buf)
 	if err != nil {
@@ -86,7 +127,7 @@ func handleConnection(conn net.Conn) {
 	}
 	defer conn.Close()
 	fmt.Println(string(buf))
-	msg, err := handleRequest(buf)
+	msg, err := handleRequest(buf, directory)
 	if err != nil {
 		fmt.Println("Error handling request: ", err.Error())
 		os.Exit(1)
@@ -95,7 +136,10 @@ func handleConnection(conn net.Conn) {
 }
 
 func main() {
-
+	directory := "./"
+	if len(os.Args) > 2 {
+		directory = os.Args[2]
+	}
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
@@ -111,7 +155,7 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Accepted connection from ", conn.RemoteAddr())
-		go handleConnection(conn)
+		go handleConnection(conn, directory)
 	}
 
 }
